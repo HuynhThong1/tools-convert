@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import YTDlpWrap from 'yt-dlp-wrap'
+import ytdl from '@distube/ytdl-core'
 import path from 'path'
 import { promises as fs } from 'fs'
 import os from 'os'
-import ffmpegPath from 'ffmpeg-static'
-
-const ytDlpPath = path.join(process.cwd(), 'bin', 'yt-dlp.exe')
-
-// Timeout wrapper
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
-    ),
-  ])
-}
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url')
-  const format = request.nextUrl.searchParams.get('format') || 'webm' // mp3, webm, m4a
+  const format = request.nextUrl.searchParams.get('format') || 'webm'
 
   if (!url) {
     return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 })
@@ -30,99 +17,60 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
   }
 
-  // Validate format
-  const validFormats = ['mp3', 'webm', 'm4a']
+  // Validate format (only webm and m4a work with ytdl-core, no mp3 conversion)
+  const validFormats = ['webm', 'm4a']
   if (!validFormats.includes(format)) {
-    return NextResponse.json({ error: 'Invalid format. Use: mp3, webm, or m4a' }, { status: 400 })
+    return NextResponse.json({
+      error: 'Invalid format. Use: webm or m4a (mp3 conversion not available on serverless)'
+    }, { status: 400 })
   }
-
-  let outputPath: string | null = null
 
   try {
     console.log('Processing:', url)
 
-    // Check if yt-dlp exists
-    try {
-      await fs.access(ytDlpPath)
-    } catch {
-      return NextResponse.json({
-        error: 'yt-dlp binary not found. Please ensure yt-dlp.exe is in the bin/ folder.'
-      }, { status: 500 })
+    // Validate URL
+    if (!ytdl.validateURL(url)) {
+      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
 
-    const ytDlp = new YTDlpWrap(ytDlpPath)
-
-    // Get video info for title
+    // Get video info
     console.log('Fetching video info...')
-    const info = await withTimeout(ytDlp.getVideoInfo(url), 60000) // 60 second timeout
-    const title = info.title?.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').substring(0, 100) || 'audio'
+    const info = await ytdl.getInfo(url)
+    const title = info.videoDetails.title
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 100) || 'audio'
 
-    console.log('Title:', info.title)
+    console.log('Title:', info.videoDetails.title)
 
-    // Create temp file path with title
-    const timestamp = Date.now()
-    const outputTemplate = path.join(os.tmpdir(), `yt_${timestamp}_${title}.%(ext)s`)
+    // Select audio format
+    const audioFormat = format === 'm4a'
+      ? ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: format => format.container === 'm4a' })
+      : ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' })
 
-    console.log(`Starting download in ${format} format (this may take 30-60 seconds)...`)
-
-    // Build download arguments based on format
-    const downloadArgs = [
-      url,
-      '-o', outputTemplate,
-      '--no-playlist',
-      '--quiet'
-    ]
-
-    if (format === 'mp3') {
-      // Convert to MP3 (requires ffmpeg)
-      downloadArgs.push(
-        '-x', // Extract audio
-        '--audio-format', 'mp3',
-        '--audio-quality', '5', // 128kbps
-        '--ffmpeg-location', ffmpegPath || ''
-      )
-    } else if (format === 'm4a') {
-      // Download m4a
-      downloadArgs.push('-f', 'bestaudio[ext=m4a]/bestaudio')
-    } else {
-      // Download webm (default, fastest)
-      downloadArgs.push('-f', 'bestaudio')
+    if (!audioFormat) {
+      throw new Error('No suitable audio format found')
     }
 
-    // Download audio
-    await withTimeout(
-      ytDlp.execPromise(downloadArgs),
-      300000 // 5 minute timeout
-    )
+    console.log('Downloading audio...')
 
-    console.log('Download complete, finding file...')
+    // Download to buffer (better for serverless)
+    const chunks: Buffer[] = []
+    const stream = ytdl(url, { format: audioFormat })
 
-    // Find the downloaded file
-    const tmpDir = os.tmpdir()
-    const files = await fs.readdir(tmpDir)
-    const downloadedFile = files.find(f => f.startsWith(`yt_${timestamp}_${title}.`))
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('end', () => resolve())
+      stream.on('error', (err) => reject(err))
+    })
 
-    if (!downloadedFile) {
-      throw new Error('Downloaded file not found')
-    }
-
-    outputPath = path.join(tmpDir, downloadedFile)
-    const fileExt = path.extname(downloadedFile).toLowerCase()
-
-    // Determine content type
-    const contentType = fileExt === '.m4a' ? 'audio/mp4' :
-                       fileExt === '.webm' ? 'audio/webm' : 'audio/mpeg'
+    const fileBuffer = Buffer.concat(chunks)
+    const fileExt = audioFormat.container === 'm4a' ? '.m4a' : '.webm'
+    const contentType = fileExt === '.m4a' ? 'audio/mp4' : 'audio/webm'
 
     console.log('Sending file...')
 
-    // Read the file
-    const fileBuffer = await fs.readFile(outputPath)
-
-    // Delete temp file
-    await fs.unlink(outputPath)
-    outputPath = null
-
-    // Return the audio file with video title as filename
+    // Return the audio file
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {
@@ -133,14 +81,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error:', error)
-
-    // Clean up temp file if it exists
-    if (outputPath) {
-      try {
-        await fs.unlink(outputPath)
-      } catch {}
-    }
-
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Failed to process video'
     }, { status: 500 })
