@@ -1,4 +1,8 @@
-name: Deploy to Vercel
+# This workflow runs tests on every push/PR
+# For deployment, use Vercel's GitHub integration instead
+# See GITHUB_SETUP.md for instructions
+
+name: CI - Test & Build
 
 on:
   push:
@@ -11,6 +15,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    name: Test & Build
 
     steps:
       - name: Checkout code
@@ -31,19 +36,9 @@ jobs:
       - name: Run tests
         run: npm test
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+      - name: Build
+        run: npm run build
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+      - name: Tests passed ✅
+        if: success()
+        run: echo "All tests passed! Ready for deployment."
