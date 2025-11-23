@@ -1,8 +1,4 @@
-# This workflow runs tests on every push/PR
-# For deployment, use Vercel's GitHub integration instead
-# See GITHUB_SETUP.md for instructions
-
-name: CI - Test & Build
+name: Deploy to Vercel
 
 on:
   push:
@@ -15,7 +11,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Test & Build
 
     steps:
       - name: Checkout code
@@ -36,9 +31,49 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build
-        run: npm run build
+  # deploy:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
 
-      - name: Tests passed ✅
-        if: success()
-        run: echo "All tests passed! Ready for deployment."
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  #     - name: Deploy to Vercel
+  #       uses: amondnet/vercel-action@v25
+  #       with:
+  #         vercel-token: ${{ secrets.VERCEL_TOKEN }}
+  #         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+  #         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+  #         vercel-args: '--prod'
+
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/build'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci --legacy-peer-deps
+
+    - name: Build applications
+      run: npm run build
+      env:
+        NODE_OPTIONS: "--max-old-space-size=4096"
+        CI: true
+
+    - name: Install Vercel CLI
+      run: npm install --global vercel@latest
+
+    - name: Deploy to Vercel
+      run: vercel --prod --token=${{ secrets.TOOLS_APP_VERCEL_TOKEN }} --confirm

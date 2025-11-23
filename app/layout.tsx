@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Analytics } from "@vercel/analytics/next"
+// Add <Analytics /> inside <body> after {children}:
+// <body>{children}<Analytics /></body>
 
 export const metadata: Metadata = {
   title: 'YouTube to MP3 Converter',
@@ -13,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>{children}<Analytics /></body>
     </html>
   )
 }
