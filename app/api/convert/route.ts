@@ -4,6 +4,31 @@ import path from 'path'
 import { promises as fs } from 'fs'
 import os from 'os'
 
+// Create agent with optional OAuth token from environment variable
+// To get an OAuth token:
+// 1. Go to https://developers.google.com/oauthplayground/
+// 2. Select YouTube Data API v3
+// 3. Authorize and get the access token
+// 4. Add to Vercel: YOUTUBE_OAUTH_TOKEN environment variable
+const getYtdlOptions = () => {
+  const options: any = {}
+
+  // Use OAuth token if available (more reliable)
+  if (process.env.YOUTUBE_OAUTH_TOKEN) {
+    options.requestOptions = {
+      headers: {
+        'Authorization': `Bearer ${process.env.YOUTUBE_OAUTH_TOKEN}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    }
+  } else {
+    // Fallback: use agent with better headers
+    options.agent = ytdl.createAgent()
+  }
+
+  return options
+}
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url')
   const format = request.nextUrl.searchParams.get('format') || 'webm'
@@ -33,9 +58,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
 
-    // Get video info
+    // Get ytdl options once for reuse
+    const ytdlOptions = getYtdlOptions()
+
+    // Get video info with agent
     console.log('Fetching video info...')
-    const info = await ytdl.getInfo(url)
+    const info = await ytdl.getInfo(url, ytdlOptions)
     const title = info.videoDetails.title
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '_')
@@ -59,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     // Download to buffer (better for serverless)
     const chunks: Buffer[] = []
-    const stream = ytdl(url, { format: audioFormat })
+    const stream = ytdl(url, { format: audioFormat, ...ytdlOptions })
 
     await new Promise<void>((resolve, reject) => {
       stream.on('data', (chunk) => chunks.push(chunk))

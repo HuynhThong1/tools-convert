@@ -49,6 +49,9 @@ jest.mock('@distube/ytdl-core', () => {
     return formats[0]
   })
 
+  // Mock createAgent to return a dummy agent
+  ytdlMock.createAgent = jest.fn().mockReturnValue({})
+
   return {
     __esModule: true,
     default: ytdlMock
