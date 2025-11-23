@@ -36,6 +36,7 @@ const formatOptions = [
     icon: Music2,
     badge: 'Slower',
     badgeVariant: 'outline' as const,
+    disable: true
   },
 ]
 
@@ -144,7 +145,12 @@ export default function Home() {
                     {formatOptions.map((option) => {
                       const Icon = option.icon
                       return (
-                        <SelectItem key={option.value} value={option.value} className="cursor-pointer">
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          className="cursor-pointer"
+                          disabled={option.disable}
+                        >
                           <div className="flex items-center gap-3 py-1">
                             <Icon className="h-4 w-4 text-muted-foreground" />
                             <div className="flex-1">
@@ -153,6 +159,11 @@ export default function Home() {
                                 <Badge variant={option.badgeVariant} className="text-xs">
                                   {option.badge}
                                 </Badge>
+                                {option.disable && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Disabled
+                                  </Badge>
+                                )}
                               </div>
                               <p className="text-xs text-muted-foreground">
                                 {option.description} • {option.size}
