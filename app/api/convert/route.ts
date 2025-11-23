@@ -45,7 +45,10 @@ export async function GET(request: NextRequest) {
 
     // Select audio format
     const audioFormat = format === 'm4a'
-      ? ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: format => format.container === 'm4a' })
+      ? ytdl.chooseFormat(info.formats, {
+          quality: 'highestaudio',
+          filter: (fmt) => (fmt.mimeType?.includes('mp4') || fmt.mimeType?.includes('m4a')) ?? false
+        })
       : ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' })
 
     if (!audioFormat) {
@@ -65,8 +68,8 @@ export async function GET(request: NextRequest) {
     })
 
     const fileBuffer = Buffer.concat(chunks)
-    const fileExt = audioFormat.container === 'm4a' ? '.m4a' : '.webm'
-    const contentType = fileExt === '.m4a' ? 'audio/mp4' : 'audio/webm'
+    const fileExt = format === 'm4a' ? '.m4a' : '.webm'
+    const contentType = format === 'm4a' ? 'audio/mp4' : 'audio/webm'
 
     console.log('Sending file...')
 
