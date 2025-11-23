@@ -19,6 +19,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url')
+  const format = request.nextUrl.searchParams.get('format') || 'webm' // mp3, webm, m4a
 
   if (!url) {
     return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 })
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
   // Basic YouTube URL validation
   if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
     return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
+  }
+
+  // Validate format
+  const validFormats = ['mp3', 'webm', 'm4a']
+  if (!validFormats.includes(format)) {
+    return NextResponse.json({ error: 'Invalid format. Use: mp3, webm, or m4a' }, { status: 400 })
   }
 
   let outputPath: string | null = null
@@ -45,31 +52,55 @@ export async function GET(request: NextRequest) {
 
     const ytDlp = new YTDlpWrap(ytDlpPath)
 
-    // Create temp file path with timestamp
+    // Get video info for title
+    console.log('Fetching video info...')
+    const info = await withTimeout(ytDlp.getVideoInfo(url), 60000) // 60 second timeout
+    const title = info.title?.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').substring(0, 100) || 'audio'
+
+    console.log('Title:', info.title)
+
+    // Create temp file path with title
     const timestamp = Date.now()
-    const outputTemplate = path.join(os.tmpdir(), `yt_${timestamp}.%(ext)s`)
+    const outputTemplate = path.join(os.tmpdir(), `yt_${timestamp}_${title}.%(ext)s`)
 
-    console.log('Starting download (this may take 30-60 seconds)...')
+    console.log(`Starting download in ${format} format (this may take 30-60 seconds)...`)
 
-    // Download best audio directly without getting info first (faster)
+    // Build download arguments based on format
+    const downloadArgs = [
+      url,
+      '-o', outputTemplate,
+      '--no-playlist',
+      '--quiet'
+    ]
+
+    if (format === 'mp3') {
+      // Convert to MP3 (requires ffmpeg)
+      downloadArgs.push(
+        '-x', // Extract audio
+        '--audio-format', 'mp3',
+        '--audio-quality', '5', // 128kbps
+        '--ffmpeg-location', ffmpegPath || ''
+      )
+    } else if (format === 'm4a') {
+      // Download m4a
+      downloadArgs.push('-f', 'bestaudio[ext=m4a]/bestaudio')
+    } else {
+      // Download webm (default, fastest)
+      downloadArgs.push('-f', 'bestaudio')
+    }
+
+    // Download audio
     await withTimeout(
-      ytDlp.execPromise([
-        url,
-        '-f', 'bestaudio', // Download best audio in native format
-        '-o', outputTemplate,
-        '--no-playlist',
-        '--no-warnings',
-        '--quiet'
-      ]),
+      ytDlp.execPromise(downloadArgs),
       300000 // 5 minute timeout
     )
 
     console.log('Download complete, finding file...')
 
-    // Find the downloaded file (could be .webm, .m4a, etc.)
+    // Find the downloaded file
     const tmpDir = os.tmpdir()
     const files = await fs.readdir(tmpDir)
-    const downloadedFile = files.find(f => f.startsWith(`yt_${timestamp}.`))
+    const downloadedFile = files.find(f => f.startsWith(`yt_${timestamp}_${title}.`))
 
     if (!downloadedFile) {
       throw new Error('Downloaded file not found')
@@ -82,7 +113,7 @@ export async function GET(request: NextRequest) {
     const contentType = fileExt === '.m4a' ? 'audio/mp4' :
                        fileExt === '.webm' ? 'audio/webm' : 'audio/mpeg'
 
-    console.log('Download complete, sending file...')
+    console.log('Sending file...')
 
     // Read the file
     const fileBuffer = await fs.readFile(outputPath)
@@ -91,12 +122,12 @@ export async function GET(request: NextRequest) {
     await fs.unlink(outputPath)
     outputPath = null
 
-    // Return the audio file
+    // Return the audio file with video title as filename
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="youtube_audio${fileExt}"`,
+        'Content-Disposition': `attachment; filename="${title}${fileExt}"`,
         'Content-Length': fileBuffer.length.toString(),
       },
     })

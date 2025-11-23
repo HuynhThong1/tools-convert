@@ -12,14 +12,14 @@ describe('Home Page', () => {
 
   it('renders the main heading', () => {
     render(<Home />)
-    const heading = screen.getByRole('heading', { name: /YouTube → MP3/i })
+    const heading = screen.getByRole('heading', { name: /YouTube → Audio Converter/i })
     expect(heading).toBeInTheDocument()
   })
 
   it('renders the form with input and button', () => {
     render(<Home />)
     const input = screen.getByLabelText('youtube-url')
-    const button = screen.getByRole('button', { name: /Download MP3/i })
+    const button = screen.getByRole('button', { name: /Download Audio/i })
 
     expect(input).toBeInTheDocument()
     expect(button).toBeInTheDocument()
@@ -44,7 +44,7 @@ describe('Home Page', () => {
     fireEvent.change(input, { target: { value: testUrl } })
     fireEvent.submit(form)
 
-    const expectedUrl = `/api/convert?url=${encodeURIComponent(testUrl)}`
+    const expectedUrl = `/api/convert?url=${encodeURIComponent(testUrl)}&format=webm`
     expect(window.location.href).toBe(expectedUrl)
   })
 
@@ -62,8 +62,6 @@ describe('Home Page', () => {
     const heading = screen.getByRole('heading', { name: /How it works/i })
     expect(heading).toBeInTheDocument()
 
-    expect(screen.getByText(/ytdl-core/i)).toBeInTheDocument()
-    const ffmpegElements = screen.getAllByText(/ffmpeg/i)
-    expect(ffmpegElements.length).toBeGreaterThan(0)
+    expect(screen.getByText(/yt-dlp/i)).toBeInTheDocument()
   })
 })
