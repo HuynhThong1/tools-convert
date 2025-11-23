@@ -51,7 +51,7 @@ jobs:
     - name: Build applications
       run: npm run build
       env:
-        NODE_OPTIONS: "--max-old-space-size=4096"
+        NODE_OPTIONS: "--max-old-space-size=2048"
         CI: true
 
     - name: Install Vercel CLI
