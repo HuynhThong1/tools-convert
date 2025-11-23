@@ -12,7 +12,7 @@ describe('Home Page', () => {
 
   it('renders the main heading', () => {
     render(<Home />)
-    const heading = screen.getByRole('heading', { name: /YouTube → Audio Converter/i })
+    const heading = screen.getByRole('heading', { name: /YouTube to Audio Converter/i })
     expect(heading).toBeInTheDocument()
   })
 
@@ -35,7 +35,15 @@ describe('Home Page', () => {
     expect(error).toBeInTheDocument()
   })
 
-  it('redirects to API with encoded URL when valid URL is submitted', () => {
+  it('calls fetch with correct URL when valid URL is submitted', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['test'], { type: 'audio/webm' })),
+        headers: new Headers({ 'Content-Disposition': 'attachment; filename="test.webm"' })
+      } as Response)
+    )
+
     render(<Home />)
     const input = screen.getByLabelText('youtube-url')
     const form = screen.getByLabelText('convert-form')
@@ -45,7 +53,8 @@ describe('Home Page', () => {
     fireEvent.submit(form)
 
     const expectedUrl = `/api/convert?url=${encodeURIComponent(testUrl)}&format=webm`
-    expect(window.location.href).toBe(expectedUrl)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(fetch).toHaveBeenCalledWith(expectedUrl)
   })
 
   it('updates input value when user types', () => {
@@ -59,7 +68,7 @@ describe('Home Page', () => {
 
   it('renders the "How it works" section', () => {
     render(<Home />)
-    const heading = screen.getByRole('heading', { name: /How it works/i })
+    const heading = screen.getByText(/How It Works/i)
     expect(heading).toBeInTheDocument()
 
     expect(screen.getByText(/yt-dlp/i)).toBeInTheDocument()

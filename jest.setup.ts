@@ -1,5 +1,15 @@
 import '@testing-library/jest-dom'
 
+// Mock fetch for tests
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({}),
+    blob: () => Promise.resolve(new Blob()),
+    headers: new Headers(),
+  } as Response)
+) as jest.Mock
+
 // Polyfill for Next.js Request/Response
 global.Request = class Request {
   url: string

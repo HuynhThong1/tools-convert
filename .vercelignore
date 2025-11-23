@@ -1,0 +1,22 @@
+# Test files
+__tests__
+*.test.ts
+*.test.tsx
+jest.config.js
+jest.setup.ts
+
+# Development files
+*.md
+!README.md
+.vscode
+.idea
+
+# Temporary files
+tmp/
+*.log
+1763*.js
+test-*.js
+
+# Git
+.git
+.gitignore

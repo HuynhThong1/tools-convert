@@ -72,6 +72,73 @@ npm test
 
 ## Deployment
 
+### Quick Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HuynhThong1/tools-convert)
+
+Or deploy manually:
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Ready for deployment"
+   git push origin main
+   ```
+
+2. **Import to Vercel**
+   - Go to [vercel.com/new](https://vercel.com/new)
+   - Import your GitHub repository
+   - Vercel will auto-detect Next.js settings
+   - Click "Deploy"
+
+3. **Configure (if needed)**
+   - The project includes `vercel.json` with optimized settings
+   - API routes have 5-minute timeout (300s)
+   - 3GB memory allocated for video processing
+
+### Deployment Configuration
+
+The project includes:
+- ✅ `vercel.json` - Vercel-specific configuration
+- ✅ `next.config.ts` - Next.js production settings
+- ✅ `.vercelignore` - Files to exclude from deployment
+- ✅ Standalone output mode for optimal performance
+
+### Important Notes for Vercel
+
+⚠️ **Function Timeout**: Video conversion can take time. Make sure you have:
+- **Pro Plan or higher** for extended function duration (60s+)
+- For Free/Hobby tier, consider shorter videos or alternative approaches
+
+⚠️ **yt-dlp Binary**: The current implementation uses `yt-dlp-wrap`. For production:
+- Ensure `yt-dlp` binary is available in `/bin` folder
+- Or switch to `@distube/ytdl-core` for serverless compatibility
+- See `DEPLOYMENT.md` for detailed instructions
+
+### Testing Before Deployment
+
+```bash
+# Run all tests
+npm test
+
+# Build production bundle
+npm run build
+
+# Test production build locally
+npm start
+```
+
+### Alternative Deployment Options
+
+- **Railway**: `railway up`
+- **Render**: Connect GitHub repo
+- **Docker**: See `DEPLOYMENT.md` for container setup
+- **VPS**: Traditional server deployment
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+## Deployment
+
 ### Vercel Deployment
 
 The project is configured for automatic deployment to Vercel using GitHub Actions.
