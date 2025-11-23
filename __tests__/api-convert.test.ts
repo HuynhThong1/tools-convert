@@ -3,37 +3,55 @@
  * Tests the /api/convert endpoint
  */
 import { GET } from '../app/api/convert/route'
-import path from 'path'
+import { Readable } from 'stream'
 
-// Mock yt-dlp-wrap
-jest.mock('yt-dlp-wrap', () => {
-  return jest.fn().mockImplementation(() => ({
-    getVideoInfo: jest.fn().mockResolvedValue({
+// Mock @distube/ytdl-core
+jest.mock('@distube/ytdl-core', () => {
+  const mockStream = () => {
+    return new Readable({
+      read() {
+        this.push(Buffer.from('fake-audio-data'))
+        this.push(null) // End the stream
+      }
+    })
+  }
+
+  const ytdlMock: any = jest.fn().mockImplementation(mockStream)
+
+  ytdlMock.validateURL = jest.fn().mockImplementation((url: string) => {
+    return url.includes('youtube.com') || url.includes('youtu.be')
+  })
+
+  ytdlMock.getInfo = jest.fn().mockResolvedValue({
+    videoDetails: {
       title: 'Test Video Title - Amazing Song',
-      duration: 180
-    }),
-    execPromise: jest.fn().mockResolvedValue(undefined)
-  }))
-})
+      lengthSeconds: '180'
+    },
+    formats: [
+      {
+        mimeType: 'audio/webm; codecs="opus"',
+        audioQuality: 'AUDIO_QUALITY_MEDIUM',
+        itag: 251
+      },
+      {
+        mimeType: 'audio/mp4; codecs="mp4a.40.2"',
+        audioQuality: 'AUDIO_QUALITY_MEDIUM',
+        itag: 140
+      }
+    ]
+  })
 
-// Mock fs promises
-jest.mock('fs', () => {
-  let mockFiles: string[] = []
+  ytdlMock.chooseFormat = jest.fn().mockImplementation((formats: any[], options: any) => {
+    // Return the first format that matches the filter
+    if (options.filter && typeof options.filter === 'function') {
+      return formats.find(options.filter) || formats[0]
+    }
+    return formats[0]
+  })
 
   return {
-    promises: {
-      access: jest.fn().mockResolvedValue(undefined),
-      readFile: jest.fn().mockResolvedValue(Buffer.from('fake-audio-data')),
-      unlink: jest.fn().mockResolvedValue(undefined),
-      readdir: jest.fn().mockImplementation(() => {
-        // Return files that match the pattern yt_<timestamp>_<title>.<ext>
-        return Promise.resolve([
-          'some_other_file.txt',
-          ...mockFiles
-        ])
-      })
-    },
-    __setMockFiles: (files: string[]) => { mockFiles = files }
+    __esModule: true,
+    default: ytdlMock
   }
 })
 
@@ -45,23 +63,8 @@ function createMockRequest(url: string) {
 }
 
 describe('API /api/convert', () => {
-  const FIXED_TIMESTAMP = 1234567890
-
   beforeEach(() => {
     jest.clearAllMocks()
-
-    // Mock Date.now() to return fixed timestamp
-    jest.spyOn(Date, 'now').mockReturnValue(FIXED_TIMESTAMP)
-
-    // Setup mock to return file with fixed timestamp
-    const fs = require('fs')
-    const mockReaddir = fs.promises.readdir as jest.Mock
-    mockReaddir.mockImplementation(() => {
-      return Promise.resolve([
-        `yt_${FIXED_TIMESTAMP}_Test_Video_Title_-_Amazing_Song.webm`,
-        'other_file.txt'
-      ])
-    })
   })
 
   afterEach(() => {
@@ -92,26 +95,25 @@ describe('API /api/convert', () => {
 
     const response = await GET(request)
 
+    if (response.status !== 200) {
+      const errorData = await response.json()
+      console.error('Error response:', errorData)
+    }
+
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('audio/webm')
     expect(response.headers.get('Content-Disposition')).toContain('Test_Video_Title_-_Amazing_Song')
-  }, 10000)
+  })
 
-  it('supports mp3 format parameter', async () => {
-    const fs = require('fs')
-    const mockReaddir = fs.promises.readdir as jest.Mock
-    mockReaddir.mockResolvedValueOnce([
-      `yt_${FIXED_TIMESTAMP}_Test_Video_Title_-_Amazing_Song.mp3`,
-      'other_file.txt'
-    ])
-
+  it('supports m4a format parameter', async () => {
     const validUrl = 'https://www.youtube.com/watch?v=test'
-    const request = createMockRequest(`http://localhost:3000/api/convert?url=${encodeURIComponent(validUrl)}&format=mp3`)
+    const request = createMockRequest(`http://localhost:3000/api/convert?url=${encodeURIComponent(validUrl)}&format=m4a`)
 
     const response = await GET(request)
 
     expect(response.status).toBe(200)
-  }, 10000)
+    expect(response.headers.get('Content-Type')).toBe('audio/mp4')
+  })
 
   it('returns 400 for invalid format', async () => {
     const validUrl = 'https://www.youtube.com/watch?v=test'
@@ -124,9 +126,10 @@ describe('API /api/convert', () => {
     expect(data.error).toContain('Invalid format')
   })
 
-  it('handles yt-dlp binary not found error', async () => {
-    const fs = require('fs')
-    fs.promises.access.mockRejectedValueOnce(new Error('ENOENT'))
+  it('handles error when ytdl-core fails', async () => {
+    const ytdl = require('@distube/ytdl-core').default
+    const originalGetInfo = ytdl.getInfo
+    ytdl.getInfo = jest.fn().mockRejectedValueOnce(new Error('Video unavailable'))
 
     const validUrl = 'https://www.youtube.com/watch?v=test'
     const request = createMockRequest(`http://localhost:3000/api/convert?url=${encodeURIComponent(validUrl)}`)
@@ -135,6 +138,9 @@ describe('API /api/convert', () => {
 
     expect(response.status).toBe(500)
     const data = await response.json()
-    expect(data.error).toContain('yt-dlp binary not found')
+    expect(data.error).toBeDefined()
+
+    // Restore the original mock
+    ytdl.getInfo = originalGetInfo
   })
 })

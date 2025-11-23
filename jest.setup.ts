@@ -1,4 +1,25 @@
 import '@testing-library/jest-dom'
+import { TextEncoder, TextDecoder } from 'util'
+import { ReadableStream, WritableStream, TransformStream } from 'stream/web'
+import { MessageChannel, MessagePort } from 'worker_threads'
+import { setImmediate, clearImmediate } from 'timers'
+
+// Polyfill TextEncoder/TextDecoder for Node.js test environment
+global.TextEncoder = TextEncoder
+global.TextDecoder = TextDecoder as any
+
+// Polyfill setImmediate/clearImmediate for jsdom
+global.setImmediate = setImmediate
+global.clearImmediate = clearImmediate
+
+// Polyfill Web Streams API for Node.js test environment
+global.ReadableStream = ReadableStream as any
+global.WritableStream = WritableStream as any
+global.TransformStream = TransformStream as any
+
+// Polyfill MessageChannel/MessagePort for Node.js test environment
+global.MessageChannel = MessageChannel as any
+global.MessagePort = MessagePort as any
 
 // Mock fetch for tests
 global.fetch = jest.fn(() =>
