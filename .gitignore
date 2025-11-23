@@ -29,6 +29,9 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Vercel
 .vercel
@@ -36,3 +39,29 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Audio downloads
+downloads/
+audio/
+*.mp3
+*.webm
+*.m4a
+
+# Player scripts (from tests)
+*-player-script.js

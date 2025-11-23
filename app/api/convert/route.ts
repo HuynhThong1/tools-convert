@@ -3,21 +3,21 @@ import ytdl from '@distube/ytdl-core'
 import path from 'path'
 import { promises as fs } from 'fs'
 import os from 'os'
+import { getValidToken } from '@/lib/youtube-oauth'
 
-// Create agent with optional OAuth token from environment variable
-// To get an OAuth token:
-// 1. Go to https://developers.google.com/oauthplayground/
-// 2. Select YouTube Data API v3
-// 3. Authorize and get the access token
-// 4. Add to Vercel: YOUTUBE_OAUTH_TOKEN environment variable
-const getYtdlOptions = () => {
+/**
+ * Get ytdl options with auto-refreshing OAuth token
+ */
+const getYtdlOptions = async () => {
   const options: any = {}
 
-  // Use OAuth token if available (more reliable)
-  if (process.env.YOUTUBE_OAUTH_TOKEN) {
+  // Try to get a valid OAuth token (will auto-refresh if configured)
+  const token = await getValidToken()
+
+  if (token) {
     options.requestOptions = {
       headers: {
-        'Authorization': `Bearer ${process.env.YOUTUBE_OAUTH_TOKEN}`,
+        'Authorization': `Bearer ${token}`,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     }
@@ -58,8 +58,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
     }
 
-    // Get ytdl options once for reuse
-    const ytdlOptions = getYtdlOptions()
+    // Get ytdl options with valid token (will auto-refresh if needed)
+    const ytdlOptions = await getYtdlOptions()
 
     // Get video info with agent
     console.log('Fetching video info...')

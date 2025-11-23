@@ -4,11 +4,14 @@ A Next.js application that converts YouTube videos to MP3 audio files using Type
 
 ## Features
 
-- 🎵 Convert YouTube videos to MP3 format
+- 🎵 Convert YouTube videos to audio (WebM, M4A formats)
+- 🔄 **Auto-refreshing OAuth tokens** - Never manually refresh again!
+- 🤖 Bypass YouTube bot detection with OAuth authentication
 - ⚡ Built with Next.js 15 and TypeScript
+- ☁️ Serverless-ready deployment (Vercel, Netlify, AWS Lambda)
 - 🧪 Comprehensive unit tests with Jest
 - 🚀 Automated deployment to Vercel via GitHub Actions
-- 📦 Server-side audio processing with ffmpeg
+- 📦 Server-side audio processing with ytdl-core
 - 🎨 Clean, responsive UI
 
 ## Tech Stack
@@ -16,9 +19,10 @@ A Next.js application that converts YouTube videos to MP3 audio files using Type
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
 - **Testing**: Jest + React Testing Library
-- **Audio Processing**: @distube/ytdl-core + fluent-ffmpeg + ffmpeg-static
+- **Audio Processing**: @distube/ytdl-core (serverless-compatible)
+- **OAuth Management**: Auto-refreshing token system
 - **CI/CD**: GitHub Actions
-- **Deployment**: Vercel
+- **Deployment**: Vercel (Hobby plan compatible)
 
 > **Note**: This project uses `@distube/ytdl-core`, a maintained fork of `ytdl-core` that provides better compatibility with YouTube's frequent API changes.
 
@@ -48,6 +52,28 @@ npm run dev
 ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### OAuth Setup (Recommended for Production)
+
+To avoid YouTube's "Sign in to confirm you're not a bot" error, set up auto-refreshing OAuth tokens:
+
+**Quick Setup:**
+```bash
+# See detailed instructions in OAUTH_SETUP.md
+# You'll need:
+# 1. Google Cloud Project with YouTube API enabled
+# 2. OAuth Client ID and Secret
+# 3. Refresh Token (never expires!)
+
+# Add to .env.local:
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_REFRESH_TOKEN=your_refresh_token
+```
+
+📖 **Full Setup Guide**: See [OAUTH_SETUP.md](./OAUTH_SETUP.md) for complete step-by-step instructions.
+
+🔧 **Alternative**: Use static token (expires in 1 hour) - see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
 ## Available Scripts
 
